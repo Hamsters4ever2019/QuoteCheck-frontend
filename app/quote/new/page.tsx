@@ -1,134 +1,163 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Container, Box, Typography, TextField, Button,
-  Alert, CircularProgress, Paper, MenuItem, Stack,
+  Container, Typography, Paper, TextField, Button, Stack, MenuItem, Alert, CircularProgress,
 } from "@mui/material";
-import { createQuote, QuoteInput } from "../../lib/api";
+import {
+  createQuote, listJobTypes, getSettings, getTradeSetting, JobType, SettingsResponse,
+} from "../../lib/api";
 
-const JOB_TYPES = [
-  { id: 1, name: "Rewire", hours: 16, materials: 450, travel: 24 },
-  { id: 2, name: "Consumer Unit", hours: 4, materials: 120, travel: 12 },
-  { id: 3, name: "EICR", hours: 3, materials: 0, travel: 12 },
-  { id: 4, name: "Fault Finding", hours: 2, materials: 0, travel: 12 },
-  { id: 5, name: "Lighting Install", hours: 6, materials: 200, travel: 12 },
-  { id: 6, name: "EV Charger", hours: 5, materials: 600, travel: 16 },
-];
-
-const DEFAULTS: QuoteInput = {
-  job_type_id: 1,
-  estimated_hours: 16,
-  materials_cost: 450,
-  travel_distance: 24,
-  hourly_rate: 45,
-  vehicle_cost_per_mile: 0.45,
-  overhead_pct: 15,
-  target_margin_pct: 25,
-  quote_price: 1500,
-};
-
-export default function NewQuotePage() {
+function NewQuoteContent() {
   const router = useRouter();
-  const [form, setForm] = useState<QuoteInput>(DEFAULTS);
-  const [loading, setLoading] = useState(false);
+
+  const [jobTypes, setJobTypes] = useState<JobType[]>([]);
+  const [jobTypeId, setJobTypeId] = useState<number | "">("");
+  const [trade, setTrade] = useState<string>("Electrician");
+
+  const [hours, setHours] = useState("16");
+  const [materials, setMaterials] = useState("450");
+  const [travel, setTravel] = useState("24");
+  const [quotePrice, setQuotePrice] = useState("1500");
+
+  const [settings, setSettings] = useState<SettingsResponse>({});
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const update = (key: keyof QuoteInput, value: string) => {
-    setForm((f) => ({ ...f, [key]: value === "" ? 0 : parseFloat(value) }));
-  };
+  useEffect(() => {
+    (async () => {
+      try {
+        const [tradeRes, settingsRes] = await Promise.all([
+          getTradeSetting(),
+          getSettings(),
+        ]);
+        setTrade(tradeRes.trade_category);
+        setSettings(settingsRes);
 
-  const handleJobType = (id: number) => {
-    const jt = JOB_TYPES.find((j) => j.id === id);
-    if (!jt) return;
-    setForm((f) => ({
-      ...f,
-      job_type_id: id,
-      estimated_hours: jt.hours,
-      materials_cost: jt.materials,
-      travel_distance: jt.travel,
-    }));
-  };
+        const jt = await listJobTypes(tradeRes.trade_category);
+        setJobTypes(jt);
+        if (jt.length > 0) setJobTypeId(jt[0].id);
+
+        setLoading(false);
+      } catch (err: any) {
+        setError(err?.message ?? "Failed to load data");
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const selectedJob = jobTypes.find((j) => j.id === jobTypeId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
     setError(null);
     try {
-      const result = await createQuote(form);
-      router.push(`/quote/${result.id}`);
+      const res = await createQuote({
+        job_type_id: jobTypeId === "" ? null : Number(jobTypeId),
+        estimated_hours: parseFloat(hours),
+        materials_cost: parseFloat(materials),
+        travel_distance: parseFloat(travel),
+        hourly_rate: Number(settings.hourly_rate ?? 45),
+        vehicle_cost_per_mile: Number(settings.vehicle_cost_per_mile ?? 0.45),
+        overhead_pct: Number(settings.overhead_pct ?? 15),
+        target_margin_pct: Number(settings.target_margin_pct ?? 25),
+        quote_price: parseFloat(quotePrice),
+      });
+      router.push(`/quote/${res.id}`);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? err.message ?? "Something went wrong");
-      setLoading(false);
+      setError(err?.response?.data?.detail ?? err?.message ?? "Something went wrong");
+      setSubmitting(false);
     }
   };
 
+  if (loading) {
+    return (
+      <Container sx={{ py: 4, textAlign: "center" }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
+
   return (
-    <Container maxWidth="sm" sx={{ py: 3 }}>
-      <Typography variant="h5" sx={{ mb: 2 }}>New Quote</Typography>
+    <Container maxWidth="sm" sx={{ py: 3, pb: 12 }}>
+      <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
+        New Quote
+      </Typography>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-      <Paper sx={{ p: 2 }}>
-        <Box component="form" onSubmit={handleSubmit}>
-          <Stack spacing={2}>
+      <Paper sx={{ p: 3 }}>
+        <form onSubmit={handleSubmit}>
+          <Stack spacing={2.5}>
             <TextField
-              select fullWidth label="Job type"
-              value={form.job_type_id ?? 1}
-              onChange={(e) => handleJobType(parseInt(e.target.value))}
+              select
+              fullWidth
+              label="Job type"
+              value={jobTypeId}
+              onChange={(e) => setJobTypeId(Number(e.target.value))}
+              helperText={`Filtered for: ${trade}`}
             >
-              {JOB_TYPES.map((jt) => (
-                <MenuItem key={jt.id} value={jt.id}>{jt.name}</MenuItem>
+              {jobTypes.map((jt) => (
+                <MenuItem key={jt.id} value={jt.id}>
+                  {jt.name}
+                </MenuItem>
               ))}
             </TextField>
 
-            <TextField
-              fullWidth label="Estimated hours" type="number"
-              slotProps={{ htmlInput: { step: "0.5", min: "0", inputMode: "decimal" } }}
-              value={form.estimated_hours || ""}
-              onChange={(e) => update("estimated_hours", e.target.value)}
-              required
-            />
+            {selectedJob && selectedJob.default_hourly_rate > 0 && (
+              <Alert severity="info" icon={false} sx={{ py: 0.5 }}>
+                {selectedJob.trade_category} default: £{selectedJob.default_hourly_rate}/hr
+              </Alert>
+            )}
 
             <TextField
-              fullWidth label="Materials cost (£)" type="number"
-              slotProps={{ htmlInput: { step: "0.01", min: "0", inputMode: "decimal" } }}
-              value={form.materials_cost || ""}
-              onChange={(e) => update("materials_cost", e.target.value)}
-              required
+              fullWidth required type="number" label="Estimated hours"
+              value={hours} onChange={(e) => setHours(e.target.value)}
+              slotProps={{ htmlInput: { step: "0.5", min: 0 } }}
             />
-
             <TextField
-              fullWidth label="Travel distance (miles)" type="number"
-              slotProps={{ htmlInput: { step: "0.1", min: "0", inputMode: "decimal" } }}
-              value={form.travel_distance || ""}
-              onChange={(e) => update("travel_distance", e.target.value)}
-              required
+              fullWidth required type="number" label="Materials cost (£)"
+              value={materials} onChange={(e) => setMaterials(e.target.value)}
+              slotProps={{ htmlInput: { step: "1", min: 0 } }}
             />
-
             <TextField
-              fullWidth label="Your quote price (£)" type="number"
-              slotProps={{ htmlInput: { step: "0.01", min: "0", inputMode: "decimal" } }}
-              value={form.quote_price || ""}
-              onChange={(e) => update("quote_price", e.target.value)}
-              required
+              fullWidth required type="number" label="Travel distance (miles)"
+              value={travel} onChange={(e) => setTravel(e.target.value)}
+              slotProps={{ htmlInput: { step: "1", min: 0 } }}
+            />
+            <TextField
+              fullWidth required type="number" label="Your quote price (£)"
+              value={quotePrice} onChange={(e) => setQuotePrice(e.target.value)}
+              slotProps={{ htmlInput: { step: "1", min: 0 } }}
             />
 
             <Typography variant="caption" color="text.secondary">
-              Defaults: £{form.hourly_rate}/hr · £{form.vehicle_cost_per_mile}/mi ·{" "}
-              {form.overhead_pct}% overhead · {form.target_margin_pct}% target
+              Defaults: £{settings.hourly_rate ?? 45}/hr · £{settings.vehicle_cost_per_mile ?? 0.45}/mi · {settings.overhead_pct ?? 15}% overhead · {settings.target_margin_pct ?? 25}% target
             </Typography>
 
+            {error && <Alert severity="error">{error}</Alert>}
+
             <Button
-              type="submit" fullWidth variant="contained" size="large"
-              disabled={loading} sx={{ py: 2, fontSize: "1.05rem" }}
+              type="submit"
+              variant="contained"
+              fullWidth
+              size="large"
+              disabled={submitting}
             >
-              {loading ? <CircularProgress size={24} /> : "Check Profitability"}
+              {submitting ? "Calculating…" : "Check Profitability"}
             </Button>
           </Stack>
-        </Box>
+        </form>
       </Paper>
     </Container>
+  );
+}
+
+export default function NewQuotePage() {
+  return (
+    <Suspense fallback={<Container sx={{ py: 4 }}><CircularProgress /></Container>}>
+      <NewQuoteContent />
+    </Suspense>
   );
 }

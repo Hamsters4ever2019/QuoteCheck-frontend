@@ -1,12 +1,14 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   Container, Box, Typography, Paper, Divider, Button,
   CircularProgress, Alert, Stack, Chip,
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from "@mui/material";
-import { getQuote, QuoteResponse } from "../../lib/api";
+import DeleteIcon from "@mui/icons-material/Delete";
+import { getQuote, deleteQuote, QuoteResponse } from "../../lib/api";
 import Link from "next/link";
 
 type QuoteDetail = QuoteResponse & {
@@ -17,10 +19,16 @@ type QuoteDetail = QuoteResponse & {
 
 function VerdictContent() {
   const params = useParams();
+  const router = useRouter();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
+
   const [quote, setQuote] = useState<QuoteDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -29,6 +37,21 @@ function VerdictContent() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const handleDelete = async () => {
+    if (!quote) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteQuote(quote.id);
+      router.push("/quotes");
+    } catch (err: any) {
+      setDeleteError(
+        err?.response?.data?.detail ?? err.message ?? "Delete failed"
+      );
+      setDeleting(false);
+    }
+  };
 
   if (loading) return <CircularProgress />;
   if (error) return <Alert severity="error">{error}</Alert>;
@@ -80,21 +103,55 @@ function VerdictContent() {
         </Stack>
       </Paper>
 
-      <Stack direction="row" spacing={1.5}>
+      <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
         <Button component={Link} href={`/quote/${quote.id}/actuals`} variant="contained" fullWidth size="large" sx={{ py: 1.5 }}>
           Log Actuals
         </Button>
-        <Button component={Link} href="/" variant="outlined" fullWidth size="large" sx={{ py: 1.5 }}>
+        <Button component={Link} href="/quotes" variant="outlined" fullWidth size="large" sx={{ py: 1.5 }}>
           Back
         </Button>
       </Stack>
+
+      <Button
+        variant="text"
+        color="error"
+        startIcon={<DeleteIcon />}
+        onClick={() => setConfirmOpen(true)}
+        fullWidth
+        size="small"
+      >
+        Delete this quote
+      </Button>
+
+      <Dialog open={confirmOpen} onClose={() => !deleting && setConfirmOpen(false)}>
+        <DialogTitle>Delete this quote?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This cannot be undone. All workings, actuals, and logged expenses
+            associated with this quote will be permanently removed.
+          </DialogContentText>
+          {deleteError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {deleteError}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmOpen(false)} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button onClick={handleDelete} color="error" disabled={deleting}>
+            {deleting ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }
 
 export default function VerdictPage() {
   return (
-    <Container maxWidth="sm" sx={{ py: 3 }}>
+    <Container maxWidth="sm" sx={{ py: 3, pb: 12 }}>
       <Suspense fallback={<CircularProgress />}>
         <VerdictContent />
       </Suspense>
