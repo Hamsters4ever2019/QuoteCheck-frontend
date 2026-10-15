@@ -8,24 +8,23 @@ import {
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { getQuote, deleteQuote, QuoteResponse } from "../../lib/api";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import { getQuote, deleteQuote, getCustomer, getBusinessSettings } from "../../lib/api";
+import { downloadQuotePDF } from "../../lib/downloadPDF";
 import Link from "next/link";
-
-type QuoteDetail = QuoteResponse & {
-  message: string;
-  customer_id?: number;
-  customer_name?: string;
-  job_type_name?: string;
-};
 
 function VerdictContent() {
   const params = useParams();
   const router = useRouter();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
-  const [quote, setQuote] = useState<QuoteDetail | null>(null);
+  const [quote, setQuote] = useState<any>(null);
+  const [customer, setCustomer] = useState<any>(null);
+  const [business, setBusiness] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -34,10 +33,36 @@ function VerdictContent() {
   useEffect(() => {
     if (!id) return;
     getQuote(Number(id))
-      .then((data) => setQuote(data as QuoteDetail))
+      .then(async (data) => {
+        setQuote(data);
+
+        // Fetch customer (if linked) and business settings in parallel
+        const tasks: Promise<any>[] = [getBusinessSettings()];
+        if (data.customer_id) {
+          tasks.push(getCustomer(data.customer_id));
+        } else {
+          tasks.push(Promise.resolve(null));
+        }
+        const [biz, cust] = await Promise.all(tasks);
+        setBusiness(biz);
+        setCustomer(cust);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const handleDownloadPDF = async () => {
+    if (!quote) return;
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      await downloadQuotePDF(quote, customer, business);
+    } catch (e: any) {
+      setDownloadError(e?.message ?? "Failed to generate PDF");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!quote) return;
@@ -60,7 +85,6 @@ function VerdictContent() {
 
   const isLoss = quote.verdict === "LOSS";
   const isThin = quote.verdict === "THIN";
-
   const color = isLoss ? "error.main" : isThin ? "warning.main" : "success.main";
   const label = isLoss ? "⚠ LOSS" : isThin ? "⚠ THIN" : "✓ GOOD";
 
@@ -89,7 +113,6 @@ function VerdictContent() {
         )}
       </Paper>
 
-      {/* ---------- CLIENT CARD ---------- */}
       {quote.customer_name && (
         <Paper sx={{ p: 2, mb: 2, bgcolor: "#f8fafc" }}>
           <Box
@@ -156,7 +179,7 @@ function VerdictContent() {
           Workings
         </Typography>
         <Stack spacing={0.5}>
-          {quote.workings.map((w, i) => (
+          {quote.workings.map((w: string, i: number) => (
             <Typography
               key={i}
               variant="body2"
@@ -168,6 +191,25 @@ function VerdictContent() {
           ))}
         </Stack>
       </Paper>
+
+      {/* ---------- Download PDF ---------- */}
+      <Button
+        variant="contained"
+        color="primary"
+        fullWidth
+        size="large"
+        startIcon={<PictureAsPdfIcon />}
+        onClick={handleDownloadPDF}
+        disabled={downloading}
+        sx={{ py: 1.5, mb: 1.5 }}
+      >
+        {downloading ? "Generating PDF…" : "Download Quote PDF"}
+      </Button>
+      {downloadError && (
+        <Alert severity="error" sx={{ mb: 1.5 }}>
+          {downloadError}
+        </Alert>
+      )}
 
       <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
         <Button

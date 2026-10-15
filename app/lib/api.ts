@@ -66,6 +66,20 @@ export interface QuoteResponse {
   materials_cost: number;
   travel_cost: number;
   overhead: number;
+  // Extra fields returned by the API and needed for the PDF template
+  customer_id?: number | null;
+  job_type_id?: number | null;
+  estimated_hours?: number;
+  travel_distance?: number;
+  hourly_rate?: number;
+  vehicle_cost_per_mile?: number;
+  overhead_pct?: number;
+  target_margin_pct?: number;
+  quote_price?: number;
+  subtotal?: number;
+  created_at?: string;
+  customer_name?: string;
+  job_type_name?: string;
 }
 
 export interface QuoteListItem {
@@ -167,16 +181,7 @@ export const listQuotes = () =>
   api.get<QuoteListItem[]>("/quotes").then((r) => r.data);
 
 export const getQuote = (id: number) =>
-  api
-    .get<
-      QuoteResponse & {
-        message: string;
-        customer_id?: number;
-        customer_name?: string;
-        job_type_name?: string;
-      }
-    >(`/quotes/${id}`)
-    .then((r) => r.data);
+  api.get<QuoteResponse>(`/quotes/${id}`).then((r) => r.data);
 
 export const logActuals = (id: number, data: ActualInput) =>
   api.post<ActualResponse>(`/quotes/${id}/actuals`, data).then((r) => r.data);
@@ -258,6 +263,25 @@ export const setTradeSetting = (trade_category: string) =>
   api
     .post<{ trade_category: string }>("/settings/trade", { trade_category })
     .then((r) => r.data);
+
+// ---------- BUSINESS SETTINGS ----------
+
+export interface BusinessSettings {
+  business_name: string;
+  business_tagline: string;
+  business_address: string;
+  business_phone: string;
+  business_email: string;
+  business_website: string;
+  business_vat: string;
+  business_terms: string;
+}
+
+export const getBusinessSettings = () =>
+  api.get<BusinessSettings>("/settings/business").then((r) => r.data);
+
+export const setBusinessSettings = (data: Partial<BusinessSettings>) =>
+  api.post<BusinessSettings>("/settings/business", data).then((r) => r.data);
 
 // ---------- JOB TYPES ----------
 
