@@ -6,7 +6,12 @@ import {
   Alert, CircularProgress, Divider,
 } from "@mui/material";
 import Link from "next/link";
-import { getSettings, getTradeSetting, setTradeSetting } from "../lib/api";
+import {
+  getSettings,
+  getTradeSetting,
+  setTradeSetting,
+  setRatesSettings,
+} from "../lib/api";
 
 const TRADES = ["Electrician", "Plumber", "Carpenter", "Decorator", "Bricklayer", "General"];
 
@@ -26,9 +31,11 @@ function SettingsContent() {
     Promise.all([getSettings(), getTradeSetting()])
       .then(([s, t]) => {
         if (s.hourly_rate !== undefined) setHourlyRate(String(s.hourly_rate));
-        if (s.vehicle_cost_per_mile !== undefined) setVehicleCost(String(s.vehicle_cost_per_mile));
+        if (s.vehicle_cost_per_mile !== undefined)
+          setVehicleCost(String(s.vehicle_cost_per_mile));
         if (s.overhead_pct !== undefined) setOverhead(String(s.overhead_pct));
-        if (s.target_margin_pct !== undefined) setTargetMargin(String(s.target_margin_pct));
+        if (s.target_margin_pct !== undefined)
+          setTargetMargin(String(s.target_margin_pct));
         setTrade(t.trade_category);
         setLoading(false);
       })
@@ -43,13 +50,36 @@ function SettingsContent() {
     setMessage(null);
     setError(null);
     try {
-      // Save trade first (it triggers the profile)
-      await setTradeSetting(trade);
-      setMessage(`Trade updated to ${trade}. Reloading app data…`);
-      // Give the backend a moment, then reload the page
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 1200);
+      // Validate the numeric fields before sending
+      const parsedRate = parseFloat(hourlyRate);
+      const parsedVehicle = parseFloat(vehicleCost);
+      const parsedOverhead = parseFloat(overhead);
+      const parsedMargin = parseFloat(targetMargin);
+
+      if (
+        isNaN(parsedRate) || parsedRate <= 0 ||
+        isNaN(parsedVehicle) || parsedVehicle <= 0 ||
+        isNaN(parsedOverhead) || parsedOverhead < 0 ||
+        isNaN(parsedMargin) || parsedMargin < 0
+      ) {
+        setError("Please check your numbers — all fields must be valid and positive.");
+        setSaving(false);
+        return;
+      }
+
+      // Save both trade and rates in parallel
+      await Promise.all([
+        setTradeSetting(trade),
+        setRatesSettings({
+          hourly_rate: parsedRate,
+          vehicle_cost_per_mile: parsedVehicle,
+          overhead_pct: parsedOverhead,
+          target_margin_pct: parsedMargin,
+        }),
+      ]);
+
+      setMessage("Settings saved.");
+      setSaving(false);
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? err.message ?? "Save failed");
       setSaving(false);
@@ -81,7 +111,9 @@ function SettingsContent() {
             helperText="This loads default job types and expense categories for your trade."
           >
             {TRADES.map((t) => (
-              <MenuItem key={t} value={t}>{t}</MenuItem>
+              <MenuItem key={t} value={t}>
+                {t}
+              </MenuItem>
             ))}
           </TextField>
 
@@ -160,7 +192,13 @@ function SettingsContent() {
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<Container sx={{ py: 4 }}><CircularProgress /></Container>}>
+    <Suspense
+      fallback={
+        <Container sx={{ py: 4 }}>
+          <CircularProgress />
+        </Container>
+      }
+    >
       <SettingsContent />
     </Suspense>
   );

@@ -263,6 +263,22 @@ export const setTradeSetting = (trade_category: string) =>
   api
     .post<{ trade_category: string }>("/settings/trade", { trade_category })
     .then((r) => r.data);
+	
+// ---------- RATES SETTINGS ----------
+
+export interface RatesSettings {
+  hourly_rate: number;
+  vehicle_cost_per_mile: number;
+  overhead_pct: number;
+  target_margin_pct: number;
+}
+
+export const getRatesSettings = () =>
+  api.get<RatesSettings>("/settings/rates").then((r) => r.data);
+
+export const setRatesSettings = (data: RatesSettings) =>
+  api.post<RatesSettings>("/settings/rates", data).then((r) => r.data);	
+	
 
 // ---------- BUSINESS SETTINGS ----------
 
