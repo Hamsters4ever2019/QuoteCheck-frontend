@@ -74,7 +74,6 @@ function DashboardContent() {
             : `${month.total_quotes} ${month.total_quotes === 1 ? "quote" : "quotes"} — no actuals logged yet`}
         </Typography>
 
-        {/* Column headers */}
         <Box
           sx={{
             display: "flex",
@@ -177,7 +176,6 @@ function DashboardContent() {
             Projected from booked jobs with a scheduled date
           </Typography>
 
-          {/* Column headers */}
           <Box
             sx={{
               display: "flex",
@@ -270,7 +268,11 @@ function DashboardContent() {
 
       {/* ---------- QUOTES THIS MONTH ---------- */}
       <Paper sx={{ p: 2.5, mb: 2 }}>
-        <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1 }}>
+        <Typography
+          variant="overline"
+          color="text.secondary"
+          sx={{ letterSpacing: 1 }}
+        >
           Quotes This Month
         </Typography>
         <Box sx={{ mt: 1.5, mb: 1 }}>
@@ -301,10 +303,17 @@ function DashboardContent() {
           </Typography>
           <Typography variant="body2" sx={{ mb: 1.5 }}>
             <strong>{warning.loss_count}</strong>{" "}
-            {warning.loss_count === 1 ? "LOSS quote" : "LOSS quotes"} this month. That
-            is <strong>£{warning.loss_shortfall.toFixed(2)}</strong> of your profit gone.
+            {warning.loss_count === 1 ? "LOSS quote" : "LOSS quotes"} this month.
+            That is <strong>£{warning.loss_shortfall.toFixed(2)}</strong> of your
+            profit gone.
           </Typography>
-          <Button component={Link} href="/quotes" variant="contained" size="small" fullWidth>
+          <Button
+            component={Link}
+            href="/quotes"
+            variant="contained"
+            size="small"
+            fullWidth
+          >
             Review them →
           </Button>
         </Paper>
@@ -313,7 +322,11 @@ function DashboardContent() {
       {/* ---------- TOP CLIENTS ---------- */}
       {top_clients.length > 0 && (
         <Paper sx={{ p: 2.5, mb: 2 }}>
-          <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1 }}>
+          <Typography
+            variant="overline"
+            color="text.secondary"
+            sx={{ letterSpacing: 1 }}
+          >
             Top Clients
           </Typography>
           <Stack spacing={1.5} sx={{ mt: 1.5 }}>
@@ -333,10 +346,29 @@ function DashboardContent() {
                     £{c.revenue.toFixed(2)}
                   </Typography>
                 </Box>
-                <Typography variant="caption" color="text.secondary">
-                  {c.job_count} {c.job_count === 1 ? "job" : "jobs"} · avg{" "}
-                  {c.avg_margin.toFixed(1)}% margin
-                </Typography>
+                <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
+                  {c.good_count > 0 && (
+                    <Chip
+                      label={`${c.good_count} GOOD`}
+                      color="success"
+                      size="small"
+                    />
+                  )}
+                  {c.thin_count > 0 && (
+                    <Chip
+                      label={`${c.thin_count} THIN`}
+                      color="warning"
+                      size="small"
+                    />
+                  )}
+                  {c.loss_count > 0 && (
+                    <Chip
+                      label={`${c.loss_count} LOSS`}
+                      color="error"
+                      size="small"
+                    />
+                  )}
+                </Stack>
               </Box>
             ))}
           </Stack>
@@ -382,15 +414,16 @@ function PLRow({
     rawVariance === null
       ? null
       : favourable === "down"
-        ? -rawVariance
-        : rawVariance;
+      ? -rawVariance
+      : rawVariance;
 
   let varColor = "text.disabled";
   if (variance !== null && Math.abs(variance) > 0.005) {
     varColor = variance > 0 ? "success.main" : "error.main";
   }
 
-  const fmt = (v: number) => (isPercent ? `${v.toFixed(1)}%` : `£${v.toFixed(2)}`);
+  const fmt = (v: number) =>
+    isPercent ? `${v.toFixed(1)}%` : `£${v.toFixed(2)}`;
 
   // Sign comes BEFORE the currency symbol — "+£3,031.05", not "£+3031.05"
   const formatVariance = (v: number) => {
@@ -436,7 +469,12 @@ function PLRow({
       </Typography>
       <Typography
         variant="body2"
-        sx={{ width: "24%", textAlign: "right", fontWeight: 700, color: varColor }}
+        sx={{
+          width: "24%",
+          textAlign: "right",
+          fontWeight: 700,
+          color: varColor,
+        }}
       >
         {variance === null ? "—" : formatVariance(variance)}
       </Typography>

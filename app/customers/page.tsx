@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Container, Box, Typography, Button, Card, CardContent,
-  Stack, CircularProgress, Alert, CardActionArea,
+  Stack, CircularProgress, Alert, CardActionArea, Chip,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import Link from "next/link";
@@ -69,7 +69,13 @@ export default function CustomersPage() {
           <Card key={c.id}>
             <CardActionArea component={Link} href={`/customers/${c.id}`}>
               <CardContent>
-                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    mb: 0.5,
+                  }}
+                >
                   <Typography variant="subtitle1" fontWeight={600}>
                     {c.name}
                   </Typography>
@@ -77,12 +83,44 @@ export default function CustomersPage() {
                     {c.job_count} {c.job_count === 1 ? "job" : "jobs"}
                   </Typography>
                 </Box>
-                <Typography variant="body2" color="text.secondary">
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 1 }}
+                >
                   £{c.total_revenue.toFixed(2)} revenue
-                  {c.job_count > 0 && ` · ${c.avg_margin.toFixed(1)}% avg margin`}
                 </Typography>
+                {c.job_count > 0 && (
+                  <Stack direction="row" spacing={0.5}>
+                    {c.good_count > 0 && (
+                      <Chip
+                        label={`${c.good_count} GOOD`}
+                        color="success"
+                        size="small"
+                      />
+                    )}
+                    {c.thin_count > 0 && (
+                      <Chip
+                        label={`${c.thin_count} THIN`}
+                        color="warning"
+                        size="small"
+                      />
+                    )}
+                    {c.loss_count > 0 && (
+                      <Chip
+                        label={`${c.loss_count} LOSS`}
+                        color="error"
+                        size="small"
+                      />
+                    )}
+                  </Stack>
+                )}
                 {(c.phone || c.email) && (
-                  <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: "block" }}>
+                  <Typography
+                    variant="caption"
+                    color="text.disabled"
+                    sx={{ mt: 1, display: "block" }}
+                  >
                     {[c.phone, c.email].filter(Boolean).join(" · ")}
                   </Typography>
                 )}

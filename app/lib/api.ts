@@ -2,9 +2,9 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1",
-  headers: { 
+  headers: {
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true" 
+    "ngrok-skip-browser-warning": "true",
   },
 });
 
@@ -168,16 +168,23 @@ export const listQuotes = () =>
 
 export const getQuote = (id: number) =>
   api
-    .get<QuoteResponse & { message: string; customer_name?: string; job_type_name?: string }>(
-      `/quotes/${id}`
-    )
+    .get<
+      QuoteResponse & {
+        message: string;
+        customer_id?: number;
+        customer_name?: string;
+        job_type_name?: string;
+      }
+    >(`/quotes/${id}`)
     .then((r) => r.data);
 
 export const logActuals = (id: number, data: ActualInput) =>
   api.post<ActualResponse>(`/quotes/${id}/actuals`, data).then((r) => r.data);
 
 export const deleteQuote = (id: number) =>
-  api.delete<{ deleted: number; message: string }>(`/quotes/${id}`).then((r) => r.data);
+  api
+    .delete<{ deleted: number; message: string }>(`/quotes/${id}`)
+    .then((r) => r.data);
 
 // ---------- DASHBOARD ----------
 
@@ -209,7 +216,9 @@ export interface DashboardResponse {
     name: string;
     job_count: number;
     revenue: number;
-    avg_margin: number;
+    good_count: number;
+    thin_count: number;
+    loss_count: number;
   }[];
 }
 
@@ -246,7 +255,9 @@ export const getTradeSetting = () =>
   api.get<{ trade_category: string }>("/settings/trade").then((r) => r.data);
 
 export const setTradeSetting = (trade_category: string) =>
-  api.post<{ trade_category: string }>("/settings/trade", { trade_category }).then((r) => r.data);
+  api
+    .post<{ trade_category: string }>("/settings/trade", { trade_category })
+    .then((r) => r.data);
 
 // ---------- JOB TYPES ----------
 
@@ -274,10 +285,6 @@ export const createExpenseType = (data: Partial<ExpenseType>) =>
 export const deleteExpenseType = (id: number) =>
   api.delete(`/expense-types/${id}`).then((r) => r.data);
 
-
-
-
-
 // ---------- CUSTOMERS ----------
 
 export interface Customer {
@@ -294,7 +301,9 @@ export interface Customer {
 export interface CustomerSummary extends Customer {
   job_count: number;
   total_revenue: number;
-  avg_margin: number;
+  good_count: number;
+  thin_count: number;
+  loss_count: number;
   last_job_at?: string;
 }
 
@@ -303,7 +312,8 @@ export interface CustomerQuote {
   quote_price: number;
   verdict: string;
   shortfall: number;
-  actual_margin: number;
+  quoted_margin: number;
+  actual_margin?: number | null;
   created_at: string;
   estimated_hours: number;
   materials_cost: number;
@@ -316,7 +326,9 @@ export interface CustomerDetail extends Customer {
   summary: {
     job_count: number;
     total_revenue: number;
-    avg_margin: number;
+    good_count: number;
+    thin_count: number;
+    loss_count: number;
   };
 }
 
@@ -343,10 +355,6 @@ export const updateCustomer = (id: number, data: CustomerInput) =>
 
 export const deleteCustomer = (id: number) =>
   api.delete<{ deleted: number }>(`/customers/${id}`).then((r) => r.data);
-
-
-
-
 
 // ---------- AUTH ----------
 
