@@ -120,7 +120,7 @@ function DashboardContent() {
               textAlign: "right",
             }}
           >
-            VAR
+            VARIANCE
           </Typography>
         </Box>
 
@@ -358,8 +358,6 @@ export default function DashboardPage() {
   );
 }
 
-// ---------- Row: Quoted / Actual / Variance ----------
-
 function PLRow({
   label,
   budgeted,
@@ -376,18 +374,32 @@ function PLRow({
   isPercent?: boolean;
 }) {
   const hasActual = actual !== null;
-  const variance = hasActual ? actual - budgeted : null;
+  const rawVariance = hasActual ? actual - budgeted : null;
+
+  // For costs, "less than budgeted" is a win. Flip the sign so that a saving
+  // displays as a POSITIVE, green figure — not a negative, green one.
+  const variance =
+    rawVariance === null
+      ? null
+      : favourable === "down"
+        ? -rawVariance
+        : rawVariance;
+
+  let varColor = "text.disabled";
+  if (variance !== null && Math.abs(variance) > 0.005) {
+    varColor = variance > 0 ? "success.main" : "error.main";
+  }
 
   const fmt = (v: number) => (isPercent ? `${v.toFixed(1)}%` : `£${v.toFixed(2)}`);
 
-  // Colour the variance: green when it favours the tradesman, red when it doesn't
-  let varColor = "text.disabled";
-  if (variance !== null && Math.abs(variance) > 0.005) {
-    const isGood =
-      (favourable === "up" && variance > 0) ||
-      (favourable === "down" && variance < 0);
-    varColor = isGood ? "success.main" : "error.main";
-  }
+  // Sign comes BEFORE the currency symbol — "+£3,031.05", not "£+3031.05"
+  const formatVariance = (v: number) => {
+    const sign = v > 0 ? "+" : v < 0 ? "-" : "";
+    const magnitude = Math.abs(v);
+    return isPercent
+      ? `${sign}${magnitude.toFixed(1)}%`
+      : `${sign}£${magnitude.toFixed(2)}`;
+  };
 
   return (
     <Box
@@ -426,11 +438,7 @@ function PLRow({
         variant="body2"
         sx={{ width: "24%", textAlign: "right", fontWeight: 700, color: varColor }}
       >
-        {variance === null
-          ? "—"
-          : `${variance > 0 ? "+" : ""}${
-              isPercent ? variance.toFixed(1) + "%" : "£" + variance.toFixed(2)
-            }`}
+        {variance === null ? "—" : formatVariance(variance)}
       </Typography>
     </Box>
   );

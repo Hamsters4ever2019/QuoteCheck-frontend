@@ -13,6 +13,7 @@ import Link from "next/link";
 
 type QuoteDetail = QuoteResponse & {
   message: string;
+  customer_id?: number;
   customer_name?: string;
   job_type_name?: string;
 };
@@ -66,18 +67,68 @@ function VerdictContent() {
   return (
     <>
       <Paper sx={{ p: 3, mb: 2, borderLeft: 6, borderColor: color }}>
-        <Typography variant="h4" sx={{ color, mb: 1 }}>{label}</Typography>
-        <Typography variant="h6" sx={{ mb: 2 }}>{quote.message}</Typography>
+        <Typography variant="h4" sx={{ color, mb: 1 }}>
+          {label}
+        </Typography>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          {quote.message}
+        </Typography>
         {quote.shortfall > 0 && (
-          <Chip label={`Shortfall: £${quote.shortfall.toFixed(2)}`} color="error" sx={{ fontWeight: 600 }} />
+          <Chip
+            label={`Shortfall: £${quote.shortfall.toFixed(2)}`}
+            color="error"
+            sx={{ fontWeight: 600 }}
+          />
         )}
         {quote.headroom > 0 && (
-          <Chip label={`Headroom: £${quote.headroom.toFixed(2)}`} color="success" sx={{ fontWeight: 600 }} />
+          <Chip
+            label={`Headroom: £${quote.headroom.toFixed(2)}`}
+            color="success"
+            sx={{ fontWeight: 600 }}
+          />
         )}
       </Paper>
 
+      {/* ---------- CLIENT CARD ---------- */}
+      {quote.customer_name && (
+        <Paper sx={{ p: 2, mb: 2, bgcolor: "#f8fafc" }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Box>
+              <Typography variant="caption" color="text.secondary">
+                CLIENT
+              </Typography>
+              <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                {quote.customer_name}
+              </Typography>
+            </Box>
+            {quote.customer_id ? (
+              <Button
+                component={Link}
+                href={`/customers/${quote.customer_id}`}
+                size="small"
+                variant="outlined"
+              >
+                View Profile
+              </Button>
+            ) : (
+              <Typography variant="caption" color="text.disabled">
+                No profile
+              </Typography>
+            )}
+          </Box>
+        </Paper>
+      )}
+
       <Paper sx={{ p: 3, mb: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>Breakdown</Typography>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Breakdown
+        </Typography>
         <Stack spacing={1}>
           <Row label="Labour" value={`£${quote.labour_cost.toFixed(2)}`} />
           <Row label="Materials" value={`£${quote.materials_cost.toFixed(2)}`} />
@@ -86,17 +137,32 @@ function VerdictContent() {
           <Divider sx={{ my: 1 }} />
           <Row label="Total cost" value={`£${quote.total_cost.toFixed(2)}`} />
           <Row label="Required quote" value={`£${quote.required_quote.toFixed(2)}`} />
-          <Row label="Your profit" value={`£${quote.profit.toFixed(2)}`} negative={quote.profit < 0} />
+          <Row
+            label="Your profit"
+            value={`£${quote.profit.toFixed(2)}`}
+            negative={quote.profit < 0}
+          />
           <Divider sx={{ my: 1 }} />
-          <Row label="Actual margin" value={`${quote.actual_margin.toFixed(2)}%`} negative={quote.actual_margin < 0} />
+          <Row
+            label="Actual margin"
+            value={`${quote.actual_margin.toFixed(2)}%`}
+            negative={quote.actual_margin < 0}
+          />
         </Stack>
       </Paper>
 
       <Paper sx={{ p: 3, mb: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>Workings</Typography>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Workings
+        </Typography>
         <Stack spacing={0.5}>
           {quote.workings.map((w, i) => (
-            <Typography key={i} variant="body2" color="text.secondary" sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
+            <Typography
+              key={i}
+              variant="body2"
+              color="text.secondary"
+              sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}
+            >
               {i + 1}. {w}
             </Typography>
           ))}
@@ -104,10 +170,24 @@ function VerdictContent() {
       </Paper>
 
       <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
-        <Button component={Link} href={`/quote/${quote.id}/actuals`} variant="contained" fullWidth size="large" sx={{ py: 1.5 }}>
+        <Button
+          component={Link}
+          href={`/quote/${quote.id}/actuals`}
+          variant="contained"
+          fullWidth
+          size="large"
+          sx={{ py: 1.5 }}
+        >
           Log Actuals
         </Button>
-        <Button component={Link} href="/quotes" variant="outlined" fullWidth size="large" sx={{ py: 1.5 }}>
+        <Button
+          component={Link}
+          href="/quotes"
+          variant="outlined"
+          fullWidth
+          size="large"
+          sx={{ py: 1.5 }}
+        >
           Back
         </Button>
       </Stack>
@@ -159,11 +239,24 @@ export default function VerdictPage() {
   );
 }
 
-function Row({ label, value, negative }: { label: string; value: string; negative?: boolean }) {
+function Row({
+  label,
+  value,
+  negative,
+}: {
+  label: string;
+  value: string;
+  negative?: boolean;
+}) {
   return (
     <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-      <Typography variant="body2" color="text.secondary">{label}</Typography>
-      <Typography variant="body2" sx={{ fontWeight: 600, color: negative ? "error.main" : "text.primary" }}>
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography
+        variant="body2"
+        sx={{ fontWeight: 600, color: negative ? "error.main" : "text.primary" }}
+      >
         {value}
       </Typography>
     </Box>

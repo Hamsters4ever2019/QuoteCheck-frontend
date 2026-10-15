@@ -6,7 +6,8 @@ import {
   Container, Typography, Paper, TextField, Button, Stack, MenuItem, Alert, CircularProgress,
 } from "@mui/material";
 import {
-  createQuote, listJobTypes, getSettings, getTradeSetting, JobType, SettingsResponse,
+  createQuote, listJobTypes, getSettings, getTradeSetting,
+  listCustomers, JobType, SettingsResponse, CustomerSummary,
 } from "../../lib/api";
 
 function NewQuoteContent() {
@@ -15,6 +16,9 @@ function NewQuoteContent() {
   const [jobTypes, setJobTypes] = useState<JobType[]>([]);
   const [jobTypeId, setJobTypeId] = useState<number | "">("");
   const [trade, setTrade] = useState<string>("Electrician");
+
+  const [customers, setCustomers] = useState<CustomerSummary[]>([]);
+  const [customerId, setCustomerId] = useState<number | "">("");
 
   const [hours, setHours] = useState("16");
   const [materials, setMaterials] = useState("450");
@@ -29,12 +33,14 @@ function NewQuoteContent() {
   useEffect(() => {
     (async () => {
       try {
-        const [tradeRes, settingsRes] = await Promise.all([
+        const [tradeRes, settingsRes, customersRes] = await Promise.all([
           getTradeSetting(),
           getSettings(),
+          listCustomers(),
         ]);
         setTrade(tradeRes.trade_category);
         setSettings(settingsRes);
+        setCustomers(customersRes);
 
         const jt = await listJobTypes(tradeRes.trade_category);
         setJobTypes(jt);
@@ -56,6 +62,7 @@ function NewQuoteContent() {
     setError(null);
     try {
       const res = await createQuote({
+        customer_id: customerId === "" ? null : Number(customerId),
         job_type_id: jobTypeId === "" ? null : Number(jobTypeId),
         estimated_hours: parseFloat(hours),
         materials_cost: parseFloat(materials),
@@ -93,6 +100,30 @@ function NewQuoteContent() {
             <TextField
               select
               fullWidth
+              label="Client"
+              value={customerId}
+              onChange={(e) =>
+                setCustomerId(e.target.value === "" ? "" : Number(e.target.value))
+              }
+              helperText={
+                customers.length === 0
+                  ? "No clients yet — add one from the Clients tab first (optional)"
+                  : "Leave blank for a walk-in job"
+              }
+            >
+              <MenuItem value="">
+                <em>None (walk-in)</em>
+              </MenuItem>
+              {customers.map((c) => (
+                <MenuItem key={c.id} value={c.id}>
+                  {c.name}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              select
+              fullWidth
               label="Job type"
               value={jobTypeId}
               onChange={(e) => setJobTypeId(Number(e.target.value))}
@@ -112,28 +143,47 @@ function NewQuoteContent() {
             )}
 
             <TextField
-              fullWidth required type="number" label="Estimated hours"
-              value={hours} onChange={(e) => setHours(e.target.value)}
+              fullWidth
+              required
+              type="number"
+              label="Estimated hours"
+              value={hours}
+              onChange={(e) => setHours(e.target.value)}
               slotProps={{ htmlInput: { step: "0.5", min: 0 } }}
             />
             <TextField
-              fullWidth required type="number" label="Materials cost (£)"
-              value={materials} onChange={(e) => setMaterials(e.target.value)}
+              fullWidth
+              required
+              type="number"
+              label="Materials cost (£)"
+              value={materials}
+              onChange={(e) => setMaterials(e.target.value)}
               slotProps={{ htmlInput: { step: "1", min: 0 } }}
             />
             <TextField
-              fullWidth required type="number" label="Travel distance (miles)"
-              value={travel} onChange={(e) => setTravel(e.target.value)}
+              fullWidth
+              required
+              type="number"
+              label="Travel distance (miles)"
+              value={travel}
+              onChange={(e) => setTravel(e.target.value)}
               slotProps={{ htmlInput: { step: "1", min: 0 } }}
             />
             <TextField
-              fullWidth required type="number" label="Your quote price (£)"
-              value={quotePrice} onChange={(e) => setQuotePrice(e.target.value)}
+              fullWidth
+              required
+              type="number"
+              label="Your quote price (£)"
+              value={quotePrice}
+              onChange={(e) => setQuotePrice(e.target.value)}
               slotProps={{ htmlInput: { step: "1", min: 0 } }}
             />
 
             <Typography variant="caption" color="text.secondary">
-              Defaults: £{settings.hourly_rate ?? 45}/hr · £{settings.vehicle_cost_per_mile ?? 0.45}/mi · {settings.overhead_pct ?? 15}% overhead · {settings.target_margin_pct ?? 25}% target
+              Defaults: £{settings.hourly_rate ?? 45}/hr · £
+              {settings.vehicle_cost_per_mile ?? 0.45}/mi ·{" "}
+              {settings.overhead_pct ?? 15}% overhead ·{" "}
+              {settings.target_margin_pct ?? 25}% target
             </Typography>
 
             {error && <Alert severity="error">{error}</Alert>}
@@ -156,7 +206,13 @@ function NewQuoteContent() {
 
 export default function NewQuotePage() {
   return (
-    <Suspense fallback={<Container sx={{ py: 4 }}><CircularProgress /></Container>}>
+    <Suspense
+      fallback={
+        <Container sx={{ py: 4 }}>
+          <CircularProgress />
+        </Container>
+      }
+    >
       <NewQuoteContent />
     </Suspense>
   );

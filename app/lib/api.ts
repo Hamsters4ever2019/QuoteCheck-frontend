@@ -2,7 +2,10 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1",
-  headers: { "Content-Type": "application/json" },
+  headers: { 
+    "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true" 
+  },
 });
 
 // ---------- AUTH INTERCEPTORS ----------
@@ -270,6 +273,80 @@ export const createExpenseType = (data: Partial<ExpenseType>) =>
 
 export const deleteExpenseType = (id: number) =>
   api.delete(`/expense-types/${id}`).then((r) => r.data);
+
+
+
+
+
+// ---------- CUSTOMERS ----------
+
+export interface Customer {
+  id: number;
+  name: string;
+  phone?: string;
+  email?: string;
+  postcode?: string;
+  address?: string;
+  notes?: string;
+  created_at?: string;
+}
+
+export interface CustomerSummary extends Customer {
+  job_count: number;
+  total_revenue: number;
+  avg_margin: number;
+  last_job_at?: string;
+}
+
+export interface CustomerQuote {
+  id: number;
+  quote_price: number;
+  verdict: string;
+  shortfall: number;
+  actual_margin: number;
+  created_at: string;
+  estimated_hours: number;
+  materials_cost: number;
+  travel_distance: number;
+  job_type_name?: string;
+}
+
+export interface CustomerDetail extends Customer {
+  quotes: CustomerQuote[];
+  summary: {
+    job_count: number;
+    total_revenue: number;
+    avg_margin: number;
+  };
+}
+
+export interface CustomerInput {
+  name: string;
+  phone?: string;
+  email?: string;
+  postcode?: string;
+  address?: string;
+  notes?: string;
+}
+
+export const listCustomers = () =>
+  api.get<CustomerSummary[]>("/customers").then((r) => r.data);
+
+export const getCustomer = (id: number) =>
+  api.get<CustomerDetail>(`/customers/${id}`).then((r) => r.data);
+
+export const createCustomer = (data: CustomerInput) =>
+  api.post<Customer>("/customers", data).then((r) => r.data);
+
+export const updateCustomer = (id: number, data: CustomerInput) =>
+  api.put<Customer>(`/customers/${id}`, data).then((r) => r.data);
+
+export const deleteCustomer = (id: number) =>
+  api.delete<{ deleted: number }>(`/customers/${id}`).then((r) => r.data);
+
+
+
+
 
 // ---------- AUTH ----------
 

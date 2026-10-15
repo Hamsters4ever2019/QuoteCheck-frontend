@@ -5,6 +5,7 @@ import { BottomNavigation, BottomNavigationAction, Paper } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import DashboardIcon from "@mui/icons-material/Insights";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
+import PeopleIcon from "@mui/icons-material/People";
 import SettingsIcon from "@mui/icons-material/Settings";
 import { useRouter, usePathname } from "next/navigation";
 
@@ -17,10 +18,12 @@ function BottomNavInner() {
   const value =
     pathname === "/"
       ? "/"
-      : pathname.startsWith("/quotes")
+      : pathname.startsWith("/quotes") || pathname.startsWith("/quote/")
       ? "/quotes"
       : pathname.startsWith("/quote/new")
       ? "/quote/new"
+      : pathname.startsWith("/customers")
+      ? "/customers"
       : pathname.startsWith("/settings")
       ? "/settings"
       : "/";
@@ -30,6 +33,7 @@ function BottomNavInner() {
       <BottomNavigationAction label="Dashboard" value="/" icon={<DashboardIcon />} />
       <BottomNavigationAction label="Quotes" value="/quotes" icon={<HomeIcon />} />
       <BottomNavigationAction label="New" value="/quote/new" icon={<AddCircleIcon />} />
+      <BottomNavigationAction label="Clients" value="/customers" icon={<PeopleIcon />} />
       <BottomNavigationAction label="Settings" value="/settings" icon={<SettingsIcon />} />
     </BottomNavigation>
   );
