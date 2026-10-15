@@ -2,8 +2,10 @@
 
 import { Suspense, useEffect, useState } from "react";
 import {
-  Container, Typography, Paper, TextField, Button, Stack, MenuItem, Alert, CircularProgress,
+  Container, Typography, Paper, TextField, Button, Stack, MenuItem,
+  Alert, CircularProgress, Divider,
 } from "@mui/material";
+import Link from "next/link";
 import { getSettings, getTradeSetting, setTradeSetting } from "../lib/api";
 
 const TRADES = ["Electrician", "Plumber", "Carpenter", "Decorator", "Bricklayer", "General"];
@@ -131,6 +133,25 @@ function SettingsContent() {
           >
             {saving ? "Saving…" : "Save"}
           </Button>
+
+          <Divider sx={{ my: 1 }} />
+
+          <Button
+            component={Link}
+            href="/settings/business"
+            variant="outlined"
+            fullWidth
+            size="large"
+          >
+            Edit Business Details →
+          </Button>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ textAlign: "center" }}
+          >
+            These appear on every PDF quote you send to clients.
+          </Typography>
         </Stack>
       </Paper>
     </Container>
