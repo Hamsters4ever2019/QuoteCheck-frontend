@@ -8,22 +8,21 @@ const nextConfig: NextConfig = {
     return config;
   },
   
-  async rewrites() {
-    return {
-      // `beforeFiles` runs BEFORE the middleware or any client-side redirects
-      beforeFiles: [
-        {
-          source: '/:path*', 
-          destination: '/accountantquestion',
-          has: [
-            {
-              type: 'host',
-              value: 'fifteenquidukaccountantquestion.uk',
-            },
-          ],
-        },
-      ],
-    };
+  // 🚨 THE BULLETPROOF REDIRECT 🚨
+  async redirects() {
+    return [
+      {
+        source: '/:path*', // Catch EVERYTHING (/, /login, /dashboard, etc.)
+        destination: '/accountantquestion', // Send it to the landing page
+        permanent: false, // Use 307 (temporary) so browsers don't cache it forever
+        has: [
+          {
+            type: 'host',
+            value: 'fifteenquidukaccountantquestion.uk',
+          },
+        ],
+      },
+    ];
   },
 };
 
