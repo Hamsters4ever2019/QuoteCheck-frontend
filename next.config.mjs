@@ -1,27 +1,26 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // 1. Your existing build rules
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // 1. Keep your TypeScript build error ignore rule
   typescript: {
     ignoreBuildErrors: true,
   },
-  
-  // 2. The Vercel Build Fix for @react-pdf/renderer (The Canvas Fix)
+
+  // 2. Add an empty turbopack config to satisfy Next.js 16
+  turbopack: {},
+
+  // 3. Keep your canvas fix for @react-pdf/renderer
   webpack: (config) => {
     config.resolve.alias.canvas = false;
     return config;
   },
-  
-  // 3. The Domain Routing Magic for the £15 Landing Page
+
+  // 4. The domain routing magic for your £15 landing page
   async rewrites() {
     return {
-      // `beforeFiles` runs BEFORE any filesystem routes (like app/page.tsx) or middleware
       beforeFiles: [
         {
-          source: '/:path*', // Catch EVERYTHING (/, /login, etc.)
-          destination: '/accountantquestion', // Send it to the landing page
+          source: '/:path*',
+          destination: '/accountantquestion',
           has: [
             {
               type: 'host',
