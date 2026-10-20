@@ -5,16 +5,14 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
 
-  // 2. Add an empty turbopack config to satisfy Next.js 16
-  turbopack: {},
-
-  // 3. Keep your canvas fix for @react-pdf/renderer
-  webpack: (config) => {
-    config.resolve.alias.canvas = false;
-    return config;
+  // 2. THE FIX: Port the canvas alias to Turbopack
+  turbopack: {
+    resolveAlias: {
+      canvas: false,
+    },
   },
 
-  // 4. The domain routing magic for your £15 landing page
+  // 3. The domain routing magic for your £15 landing page
   async rewrites() {
     return {
       beforeFiles: [
