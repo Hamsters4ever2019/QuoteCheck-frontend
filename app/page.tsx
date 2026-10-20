@@ -157,6 +157,49 @@ function DashboardContent() {
         </Stack>
       </Paper>
 
+      {/* ---------- THE £15 ACCOUNTANT QUESTION ---------- */}
+      <Paper
+        sx={{
+          p: 2.5,
+          mb: 2,
+          border: "2px solid #0f3d3e",
+          background: "linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Box sx={{ flexGrow: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f3d3e" }}>
+              💷 Need a quick answer?
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              Ask a UK-qualified accountant a question for just <strong>£15</strong>.
+            </Typography>
+          </Box>
+          <Button
+            component="a"
+            href="https://fifteenquidukaccountantquestion.uk"
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="contained"
+            sx={{
+              bgcolor: "#0f3d3e",
+              "&:hover": { bgcolor: "#082928" },
+              whiteSpace: "nowrap",
+              fontWeight: 700,
+              fontSize: "0.85rem",
+              textTransform: "none",
+              px: 3,
+              py: 1.2,
+              boxShadow: "0 4px 14px 0 rgba(15,61,62,0.39)",
+            }}
+          >
+            Ask for £15 →
+          </Button>
+        </Stack>
+      </Paper>
+
       {/* ---------- CASH FLOW FORECAST ---------- */}
       {cashflow && (
         <Paper sx={{ p: 2.5, mb: 2 }}>

@@ -108,6 +108,9 @@ export interface ActualResponse {
   quoted_margin: number;
   delta: number;
   engine_note: string;
+  actual_hours?: number;
+  actual_materials?: number;
+  actual_travel?: number;
 }
 
 export interface JobType {
@@ -154,6 +157,15 @@ export interface SettingsResponse {
   [key: string]: any;
 }
 
+// --- NEW: Predictive Engine Types ---
+export interface MaterialSuggestion {
+  canonical_name: string;
+  default_unit: string | null;
+  last_known_price: number | null;
+  usage_count: number;
+}
+// ------------------------------------
+
 // ---------- ACTUAL EXPENSES ----------
 
 export const getExpenses = (actualId: number) =>
@@ -190,6 +202,17 @@ export const deleteQuote = (id: number) =>
   api
     .delete<{ deleted: number; message: string }>(`/quotes/${id}`)
     .then((r) => r.data);
+
+// ---------- NEW: SMART-QUOTING (PREDICTIVE ENGINE) ----------
+
+export const getMaterialSuggestions = (jobTypeId: number) =>
+  api
+    .get<MaterialSuggestion[]>("/materials/suggestions", { 
+      params: { job_type_id: jobTypeId } 
+    })
+    .then((r) => r.data);
+
+// -------------------------------------------------------------
 
 // ---------- DASHBOARD ----------
 
@@ -324,6 +347,25 @@ export const createExpenseType = (data: Partial<ExpenseType>) =>
 
 export const deleteExpenseType = (id: number) =>
   api.delete(`/expense-types/${id}`).then((r) => r.data);
+  
+  
+export async function updateQuoteSchedule(
+  id: number, 
+  data: { status: string; scheduled_date: string | null }
+) {
+  const token = localStorage.getItem("qc_token");
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"}/quotes/${id}/schedule`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    },
+    body: JSON.stringify(data),
+  });
+  
+  if (!res.ok) throw new Error("Failed to update schedule");
+  return res.json();
+}  
 
 // ---------- CUSTOMERS ----------
 

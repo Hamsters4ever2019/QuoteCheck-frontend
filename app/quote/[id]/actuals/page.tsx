@@ -11,6 +11,10 @@ import {
   logActuals, ActualResponse, listExpenseTypes, ExpenseType, 
   getExpenses, addExpense, deleteExpense, QuoteExpense 
 } from "../../../lib/api";
+import ScanInvoiceModal from "../../../components/ScanInvoiceModal";
+
+// Updated with your local URL for testing
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 function ActualsContent() {
   const params = useParams();
@@ -34,10 +38,33 @@ function ActualsContent() {
   const [selectedTypeId, setSelectedTypeId] = useState<number | "">("");
   const [expenseError, setExpenseError] = useState<string | null>(null);
 
-  // --- Fetch expense types on load ---
+  // --- Fetch expense types AND existing actuals on load ---
   useEffect(() => {
     listExpenseTypes().then(setExpenseTypes).catch(console.error);
-  }, []);
+    
+    const token = localStorage.getItem("qc_token");
+
+    // Check if actuals already exist for this quote
+    fetch(`${API_BASE}/quotes/${id}/actuals`, {
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data) {
+          setResult(data);
+          setActualId(data.actual_id);
+          
+          // NEW: Sync the form fields with the database!
+          setHours(data.actual_hours?.toString() || "0");
+          setMaterials(data.actual_materials?.toString() || "0");
+          setTravel(data.actual_travel?.toString() || "0");
+          
+          getExpenses(data.actual_id).then(setExpenses).catch(console.error);
+        }
+      }).catch(console.error);
+  }, [id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,18 +78,42 @@ function ActualsContent() {
       });
       setResult(res);
       
-      // Capture the actual_id and fetch any existing expenses
       if (res.actual_id) {
         setActualId(res.actual_id);
         getExpenses(res.actual_id).then(setExpenses).catch(console.error);
-      } else {
-        setExpenseError("Backend did not return an actual_id. Check log_actuals in main.py.");
       }
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? err?.message ?? "Something went wrong");
     } finally {
       setLoading(false);
     }
+  };
+
+  // --- Handle the OCR Scan Confirmation Safely ---
+  const handleScanConfirm = (newTotal: number) => {
+    if (!result) return; 
+    
+    const token = localStorage.getItem("qc_token");
+    
+    // NEW: Fetch the fresh numbers from the backend to ensure the UI matches the DB
+    fetch(`${API_BASE}/quotes/${id}/actuals`, {
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+          if (data) {
+            setResult(data); 
+            // Update the form inputs to reflect the database's new total
+            setMaterials(data.actual_materials?.toString() || "0");
+            
+            const targetActualId = data.actual_id || actualId;
+            if (targetActualId) {
+              getExpenses(targetActualId).then(setExpenses).catch(console.error);
+            }
+          }
+      });
   };
 
   // --- Helper: rebuild engine_note from fresh numbers ---
@@ -72,7 +123,6 @@ function ActualsContent() {
     return `Your actual margin is ${margin.toFixed(2)}%, ${direction} than the ${quotedMargin.toFixed(2)}% you quoted. Adjusting future quotes.`;
   };
 
-  // --- Expense Handlers ---
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     setExpenseError(null);
@@ -98,7 +148,6 @@ function ActualsContent() {
       setSelectedTypeId("");
       getExpenses(actualId).then(setExpenses).catch(console.error);
 
-      // --- Update result state with recalculated true figures from backend ---
       if (result && res.actual_cost !== undefined) {
         const newMargin = res.actual_margin ?? result.actual_margin;
         const newDelta = newMargin - result.quoted_margin;
@@ -112,8 +161,7 @@ function ActualsContent() {
         });
       }
     } catch (err: any) {
-      console.error("Add Expense Error:", err);
-      setExpenseError(err?.response?.data?.detail ?? err?.message ?? "Failed to add expense. Check backend terminal.");
+      setExpenseError(err?.response?.data?.detail ?? err?.message ?? "Failed to add expense.");
     }
   };
 
@@ -123,7 +171,6 @@ function ActualsContent() {
       const res = await deleteExpense(expenseId);
       getExpenses(actualId).then(setExpenses);
 
-      // --- Update result state after deletion (cost goes back down) ---
       if (result && res.actual_cost !== undefined) {
         const newMargin = res.actual_margin ?? result.actual_margin;
         const newDelta = newMargin - result.quoted_margin;
@@ -137,7 +184,6 @@ function ActualsContent() {
         });
       }
     } catch (err: any) {
-      console.error("Delete Expense Error:", err);
       setExpenseError(err?.response?.data?.detail ?? "Failed to delete expense.");
     }
   };
@@ -163,7 +209,11 @@ function ActualsContent() {
 
         {/* Itemised Expenses Section */}
         <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" gutterBottom>Itemised Expenses</Typography>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+            <Typography variant="h6">Itemised Expenses</Typography>
+            <ScanInvoiceModal quoteId={Number(id)} onConfirm={handleScanConfirm} />
+          </Box>
+          
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Log the real costs to see where the money actually went.
           </Typography>
@@ -241,11 +291,16 @@ function ActualsContent() {
               value={hours} onChange={(e) => setHours(e.target.value)}
               slotProps={{ htmlInput: { step: "0.5", min: 0 } }}
             />
-            <TextField
-              fullWidth required type="number" label="Actual materials (£)"
-              value={materials} onChange={(e) => setMaterials(e.target.value)}
-              slotProps={{ htmlInput: { step: "1", min: 0 } }}
-            />
+            
+            <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+              <TextField
+                fullWidth required type="number" label="Actual materials (£)"
+                value={materials} onChange={(e) => setMaterials(e.target.value)}
+                slotProps={{ htmlInput: { step: "1", min: 0 } }}
+              />
+              <ScanInvoiceModal quoteId={Number(id)} onConfirm={handleScanConfirm} />
+            </Box>
+
             <TextField
               fullWidth required type="number" label="Actual travel (miles)"
               value={travel} onChange={(e) => setTravel(e.target.value)}

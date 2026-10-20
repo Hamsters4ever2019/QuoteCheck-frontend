@@ -1,105 +1,106 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  Container, Box, Typography, Button, Card, CardContent,
-  Chip, Stack, CircularProgress, Alert, CardActionArea,
-} from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
+import { Suspense, useEffect, useState } from "react";
+import { Container, Typography, Paper, Stack, Box, CircularProgress, Alert, Chip, Button } from "@mui/material";
 import Link from "next/link";
-import { listQuotes, QuoteListItem } from "../lib/api";
-import Footer from "../components/Footer";
+import { listQuotes } from "../lib/api";
 
-export default function QuotesPage() {
-  const [quotes, setQuotes] = useState<QuoteListItem[]>([]);
+
+function QuotesContent() {
+  const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     listQuotes()
-      .then(setQuotes)
-      .catch((e) => setError(e.message))
+      .then((data) => {
+        // Safety net: Ensure data is an array
+        if (Array.isArray(data)) {
+          setQuotes(data);
+        } else {
+          setQuotes([]);
+        }
+      })
+      .catch((e) => setError(e.message ?? "Failed to load quotes"))
       .finally(() => setLoading(false));
   }, []);
 
-  return (
-    <Container maxWidth="sm" sx={{ py: 3, pb: 12 }}>
-      <Box sx={{ mb: 2, display: "flex", alignItems: "baseline", gap: 0.5 }}>
-        <Typography
-          variant="h5"
-          sx={{ fontWeight: 800, letterSpacing: -0.5, color: "#0f3d3e" }}
-        >
-          FD+
-        </Typography>
-        <Typography
-          variant="h5"
-          sx={{ fontWeight: 600, letterSpacing: -0.5, color: "text.primary" }}
-        >
-          QuoteCheck
-        </Typography>
-      </Box>
+  if (loading) return <CircularProgress />;
+  if (error) return <Alert severity="error">{error}</Alert>;
 
-      <Button
-        component={Link}
-        href="/quote/new"
-        variant="contained"
-        fullWidth
-        size="large"
-        startIcon={<AddIcon />}
-        sx={{ py: 2, mb: 3, fontSize: "1.1rem" }}
-      >
-        New Quote
+  return (
+    <>
+      <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
+        Your Quotes
+      </Typography>
+
+      <Button component={Link} href="/quote/new" variant="contained" fullWidth sx={{ mb: 3, py: 1.5 }}>
+        + New Quote
       </Button>
 
-      {loading && <CircularProgress />}
-      {error && <Alert severity="error">{error}</Alert>}
+      <Stack spacing={2}>
+        {quotes.map((quote) => {
+          // Safely calculate colors and labels
+          const isLoss = quote.verdict === "LOSS";
+          const isThin = quote.verdict === "THIN";
+          const verdictColor = isLoss ? "error" : isThin ? "warning" : "success";
+          const verdictLabel = isLoss ? "LOSS" : isThin ? "THIN" : "GOOD";
 
-      {!loading && quotes.length === 0 && (
-        <Card>
-          <CardContent>
-            <Typography color="text.secondary">
-              No quotes yet. Create your first one to see if it&apos;s profitable.
-            </Typography>
-          </CardContent>
-        </Card>
-      )}
-
-      <Stack spacing={1.5}>
-        {quotes.map((q) => (
-          <Card key={q.id}>
-            <CardActionArea component={Link} href={`/quote/${q.id}`}>
-              <CardContent>
-                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    {q.customer_name ?? "Unnamed"} — {q.job_type_name ?? "Job"}
+          return (
+            <Paper 
+              key={quote.id} 
+              component={Link} 
+              href={`/quote/${quote.id}`}
+              sx={{ 
+                p: 2, 
+                textDecoration: 'none', 
+                display: 'block',
+                borderLeft: 4,
+                borderColor: isLoss ? 'error.main' : isThin ? 'warning.main' : 'success.main',
+                '&:hover': { bgcolor: '#f8fafc' }
+              }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Box>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                    {quote.customer_name || "Unknown Client"}
                   </Typography>
-                  <VerdictChip verdict={q.verdict} />
+                  <Typography variant="body2" color="text.secondary">
+                    {quote.job_type_name || "General Job"} — £{quote.quote_price?.toFixed(2) || "0.00"}
+                  </Typography>
                 </Box>
-                <Typography variant="body2" color="text.secondary">
-                  £{q.quote_price.toFixed(2)} · {q.actual_margin.toFixed(1)}% margin
-                </Typography>
-                {q.shortfall > 0 && (
-                  <Typography variant="body2" color="error.main" sx={{ mt: 0.5, fontWeight: 600 }}>
-                    Shortfall: £{q.shortfall.toFixed(2)}
-                  </Typography>
-                )}
-              </CardContent>
-            </CardActionArea>
-          </Card>
-        ))}
+                <Stack direction="row" spacing={1} alignItems="center">
+                  {/* NEW: Status Chip */}
+                  {quote.status && quote.status !== "draft" && (
+                    <Chip 
+                      label={quote.status.toUpperCase()} 
+                      color="primary" 
+                      size="small" 
+                      variant="outlined"
+                    />
+                  )}
+                  <Chip 
+                    label={verdictLabel} 
+                    color={verdictColor as any} 
+                    size="small" 
+                    sx={{ fontWeight: 700 }}
+                  />
+                </Stack>
+              </Box>
+            </Paper>
+          );
+        })}
       </Stack>
-
-      <Footer />
-    </Container>
+    </>
   );
 }
 
-function VerdictChip({ verdict }: { verdict: string }) {
-  const map: Record<string, { label: string; color: "success" | "warning" | "error" }> = {
-    GOOD: { label: "Good", color: "success" },
-    THIN: { label: "Thin", color: "warning" },
-    LOSS: { label: "Loss", color: "error" },
-  };
-  const v = map[verdict] ?? { label: verdict, color: "warning" as const };
-  return <Chip label={v.label} color={v.color} size="small" />;
+export default function QuotesPage() {
+  return (
+    <Container maxWidth="sm" sx={{ py: 3, pb: 12 }}>
+      <Suspense fallback={<CircularProgress />}>
+        <QuotesContent />
+      </Suspense>
+    </Container>
+  );
 }

@@ -2,16 +2,20 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+
 import {
   Container, Box, Typography, Paper, Divider, Button,
-  CircularProgress, Alert, Stack, Chip,
+  CircularProgress, Alert, Stack, Chip, TextField, MenuItem,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
-import { getQuote, deleteQuote, getCustomer, getBusinessSettings } from "../../lib/api";
+import EventIcon from "@mui/icons-material/Event";
+import { getQuote, deleteQuote, getCustomer, getBusinessSettings, updateQuoteSchedule } from "../../lib/api";
 import { downloadQuotePDF } from "../../lib/downloadPDF";
 import Link from "next/link";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 function VerdictContent() {
   const params = useParams();
@@ -26,17 +30,29 @@ function VerdictContent() {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
+  // --- NEW: Invoice PDF State ---
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
+
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // --- NEW: Scheduling State ---
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [schedStatus, setSchedStatus] = useState("draft");
+  const [schedDate, setSchedDate] = useState("");
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
     getQuote(Number(id))
       .then(async (data) => {
         setQuote(data);
+        setSchedStatus(data.status || "draft");
+        setSchedDate(data.scheduled_date || "");
 
-        // Fetch customer (if linked) and business settings in parallel
         const tasks: Promise<any>[] = [getBusinessSettings()];
         if (data.customer_id) {
           tasks.push(getCustomer(data.customer_id));
@@ -64,6 +80,43 @@ function VerdictContent() {
     }
   };
 
+  // --- NEW: Handle Invoice PDF Generation ---
+  const handleDownloadInvoice = async () => {
+    if (!quote) return;
+    setInvoiceLoading(true);
+    setInvoiceError(null);
+    
+    try {
+      const token = localStorage.getItem("qc_token");
+      
+      // 1. Fetch the logged Actuals for this quote
+      const actualsRes = await fetch(`${API_BASE}/quotes/${quote.id}/actuals`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      
+      if (!actualsRes.ok) {
+        throw new Error("No actuals found for this quote. Please log actuals first.");
+      }
+      const actualsData = await actualsRes.json();
+
+      // 2. Fetch the Itemised Expenses
+      const expensesRes = await fetch(`${API_BASE}/actuals/${actualsData.actual_id}/expenses`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const expensesData = await expensesRes.json();
+
+      // 3. NATIVE Dynamic Import: Only loads the PDF module when this button is clicked
+      const { downloadInvoicePDF } = await import("../../lib/downloadInvoicePDF");
+      
+      await downloadInvoicePDF(quote, customer, business, actualsData, expensesData);
+      
+    } catch (e: any) {
+      setInvoiceError(e?.message ?? "Failed to generate Invoice PDF. Ensure actuals are logged.");
+    } finally {
+      setInvoiceLoading(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!quote) return;
     setDeleting(true);
@@ -72,10 +125,27 @@ function VerdictContent() {
       await deleteQuote(quote.id);
       router.push("/quotes");
     } catch (err: any) {
-      setDeleteError(
-        err?.response?.data?.detail ?? err.message ?? "Delete failed"
-      );
+      setDeleteError(err?.response?.data?.detail ?? err.message ?? "Delete failed");
       setDeleting(false);
+    }
+  };
+
+  // --- NEW: Handle Schedule Save ---
+  const handleSaveSchedule = async () => {
+    if (!quote) return;
+    setSavingSchedule(true);
+    setScheduleError(null);
+    try {
+      await updateQuoteSchedule(quote.id, {
+        status: schedStatus,
+        scheduled_date: schedDate || null,
+      });
+      setQuote({ ...quote, status: schedStatus, scheduled_date: schedDate || null });
+      setScheduleOpen(false);
+    } catch (err: any) {
+      setScheduleError(err.message ?? "Failed to save schedule");
+    } finally {
+      setSavingSchedule(false);
     }
   };
 
@@ -91,67 +161,49 @@ function VerdictContent() {
   return (
     <>
       <Paper sx={{ p: 3, mb: 2, borderLeft: 6, borderColor: color }}>
-        <Typography variant="h4" sx={{ color, mb: 1 }}>
-          {label}
-        </Typography>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <Typography variant="h4" sx={{ color, mb: 1 }}>
+            {label}
+          </Typography>
+          {/* Status Chip */}
+          <Chip 
+            label={(quote.status || "draft").toUpperCase()} 
+            color={quote.status === "booked" ? "primary" : quote.status === "completed" ? "success" : "default"}
+            size="small"
+            sx={{ fontWeight: 700 }}
+          />
+        </Box>
         <Typography variant="h6" sx={{ mb: 2 }}>
           {quote.message}
         </Typography>
         {quote.shortfall > 0 && (
-          <Chip
-            label={`Shortfall: £${quote.shortfall.toFixed(2)}`}
-            color="error"
-            sx={{ fontWeight: 600 }}
-          />
+          <Chip label={`Shortfall: £${quote.shortfall.toFixed(2)}`} color="error" sx={{ fontWeight: 600 }} />
         )}
         {quote.headroom > 0 && (
-          <Chip
-            label={`Headroom: £${quote.headroom.toFixed(2)}`}
-            color="success"
-            sx={{ fontWeight: 600 }}
-          />
+          <Chip label={`Headroom: £${quote.headroom.toFixed(2)}`} color="success" sx={{ fontWeight: 600 }} />
         )}
       </Paper>
 
       {quote.customer_name && (
         <Paper sx={{ p: 2, mb: 2, bgcolor: "#f8fafc" }}>
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <Box>
-              <Typography variant="caption" color="text.secondary">
-                CLIENT
-              </Typography>
-              <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                {quote.customer_name}
-              </Typography>
+              <Typography variant="caption" color="text.secondary">CLIENT</Typography>
+              <Typography variant="body1" sx={{ fontWeight: 600 }}>{quote.customer_name}</Typography>
             </Box>
             {quote.customer_id ? (
-              <Button
-                component={Link}
-                href={`/customers/${quote.customer_id}`}
-                size="small"
-                variant="outlined"
-              >
+              <Button component={Link} href={`/customers/${quote.customer_id}`} size="small" variant="outlined">
                 View Profile
               </Button>
             ) : (
-              <Typography variant="caption" color="text.disabled">
-                No profile
-              </Typography>
+              <Typography variant="caption" color="text.disabled">No profile</Typography>
             )}
           </Box>
         </Paper>
       )}
 
       <Paper sx={{ p: 3, mb: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Breakdown
-        </Typography>
+        <Typography variant="h6" sx={{ mb: 2 }}>Breakdown</Typography>
         <Stack spacing={1}>
           <Row label="Labour" value={`£${quote.labour_cost.toFixed(2)}`} />
           <Row label="Materials" value={`£${quote.materials_cost.toFixed(2)}`} />
@@ -160,39 +212,35 @@ function VerdictContent() {
           <Divider sx={{ my: 1 }} />
           <Row label="Total cost" value={`£${quote.total_cost.toFixed(2)}`} />
           <Row label="Required quote" value={`£${quote.required_quote.toFixed(2)}`} />
-          <Row
-            label="Your profit"
-            value={`£${quote.profit.toFixed(2)}`}
-            negative={quote.profit < 0}
-          />
+          <Row label="Your profit" value={`£${quote.profit.toFixed(2)}`} negative={quote.profit < 0} />
           <Divider sx={{ my: 1 }} />
-          <Row
-            label="Actual margin"
-            value={`${quote.actual_margin.toFixed(2)}%`}
-            negative={quote.actual_margin < 0}
-          />
+          <Row label="Actual margin" value={`${quote.actual_margin.toFixed(2)}%`} negative={quote.actual_margin < 0} />
         </Stack>
       </Paper>
 
       <Paper sx={{ p: 3, mb: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Workings
-        </Typography>
+        <Typography variant="h6" sx={{ mb: 2 }}>Workings</Typography>
         <Stack spacing={0.5}>
           {quote.workings.map((w: string, i: number) => (
-            <Typography
-              key={i}
-              variant="body2"
-              color="text.secondary"
-              sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}
-            >
+            <Typography key={i} variant="body2" color="text.secondary" sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
               {i + 1}. {w}
             </Typography>
           ))}
         </Stack>
       </Paper>
 
-      {/* ---------- Download PDF ---------- */}
+      <Button
+        variant="outlined"
+        color="secondary"
+        fullWidth
+        size="large"
+        startIcon={<EventIcon />}
+        onClick={() => setScheduleOpen(true)}
+        sx={{ py: 1.5, mb: 1.5 }}
+      >
+        Schedule Job
+      </Button>
+
       <Button
         variant="contained"
         color="primary"
@@ -205,31 +253,28 @@ function VerdictContent() {
       >
         {downloading ? "Generating PDF…" : "Download Quote PDF"}
       </Button>
-      {downloadError && (
-        <Alert severity="error" sx={{ mb: 1.5 }}>
-          {downloadError}
-        </Alert>
-      )}
+      {downloadError && <Alert severity="error" sx={{ mb: 1.5 }}>{downloadError}</Alert>}
+
+      {/* --- NEW: INVOICE PDF BUTTON --- */}
+      <Button
+        variant="contained"
+        color="secondary"
+        fullWidth
+        size="large"
+        startIcon={<PictureAsPdfIcon />}
+        onClick={handleDownloadInvoice}
+        disabled={invoiceLoading}
+        sx={{ py: 1.5, mb: 1.5 }}
+      >
+        {invoiceLoading ? "Generating Invoice…" : "Download Invoice PDF"}
+      </Button>
+      {invoiceError && <Alert severity="error" sx={{ mb: 1.5 }}>{invoiceError}</Alert>}
 
       <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
-        <Button
-          component={Link}
-          href={`/quote/${quote.id}/actuals`}
-          variant="contained"
-          fullWidth
-          size="large"
-          sx={{ py: 1.5 }}
-        >
+        <Button component={Link} href={`/quote/${quote.id}/actuals`} variant="contained" fullWidth size="large" sx={{ py: 1.5 }}>
           Log Actuals
         </Button>
-        <Button
-          component={Link}
-          href="/quotes"
-          variant="outlined"
-          fullWidth
-          size="large"
-          sx={{ py: 1.5 }}
-        >
+        <Button component={Link} href="/quotes" variant="outlined" fullWidth size="large" sx={{ py: 1.5 }}>
           Back
         </Button>
       </Stack>
@@ -245,25 +290,54 @@ function VerdictContent() {
         Delete this quote
       </Button>
 
+      {/* --- DELETE DIALOG --- */}
       <Dialog open={confirmOpen} onClose={() => !deleting && setConfirmOpen(false)}>
         <DialogTitle>Delete this quote?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            This cannot be undone. All workings, actuals, and logged expenses
-            associated with this quote will be permanently removed.
+            This cannot be undone. All workings, actuals, and logged expenses associated with this quote will be permanently removed.
           </DialogContentText>
-          {deleteError && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {deleteError}
-            </Alert>
-          )}
+          {deleteError && <Alert severity="error" sx={{ mt: 2 }}>{deleteError}</Alert>}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmOpen(false)} disabled={deleting}>
-            Cancel
-          </Button>
-          <Button onClick={handleDelete} color="error" disabled={deleting}>
-            {deleting ? "Deleting…" : "Delete"}
+          <Button onClick={() => setConfirmOpen(false)} disabled={deleting}>Cancel</Button>
+          <Button onClick={handleDelete} color="error" disabled={deleting}>{deleting ? "Deleting…" : "Delete"}</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* --- SCHEDULE DIALOG --- */}
+      <Dialog open={scheduleOpen} onClose={() => !savingSchedule && setScheduleOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Schedule Job</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              select
+              label="Job Status"
+              value={schedStatus}
+              onChange={(e) => setSchedStatus(e.target.value)}
+              fullWidth
+            >
+              <MenuItem value="draft">Draft (Not Booked)</MenuItem>
+              <MenuItem value="booked">Booked</MenuItem>
+              <MenuItem value="completed">Completed</MenuItem>
+            </TextField>
+            
+            <TextField
+              label="Scheduled Date"
+              type="date"
+              value={schedDate}
+              onChange={(e) => setSchedDate(e.target.value)}
+              fullWidth
+              slotProps={{ inputLabel: { shrink: true } }}
+              disabled={schedStatus !== "booked"}
+            />
+            {scheduleError && <Alert severity="error">{scheduleError}</Alert>}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setScheduleOpen(false)} disabled={savingSchedule}>Cancel</Button>
+          <Button onClick={handleSaveSchedule} variant="contained" disabled={savingSchedule}>
+            {savingSchedule ? "Saving…" : "Save Schedule"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -281,26 +355,11 @@ export default function VerdictPage() {
   );
 }
 
-function Row({
-  label,
-  value,
-  negative,
-}: {
-  label: string;
-  value: string;
-  negative?: boolean;
-}) {
+function Row({ label, value, negative }: { label: string; value: string; negative?: boolean }) {
   return (
     <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-      <Typography variant="body2" color="text.secondary">
-        {label}
-      </Typography>
-      <Typography
-        variant="body2"
-        sx={{ fontWeight: 600, color: negative ? "error.main" : "text.primary" }}
-      >
-        {value}
-      </Typography>
+      <Typography variant="body2" color="text.secondary">{label}</Typography>
+      <Typography variant="body2" sx={{ fontWeight: 600, color: negative ? "error.main" : "text.primary" }}>{value}</Typography>
     </Box>
   );
 }
