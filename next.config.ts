@@ -1,20 +1,23 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
-  webpack: (config) => {
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  webpack: (config: any) => {
+    // Explicitly typing 'config' as 'any' can sometimes appease Vercel's strict TS
     config.resolve.alias.canvas = false;
     return config;
   },
-  
-  // 🚨 THE BULLETPROOF REDIRECT 🚨
   async redirects() {
     return [
       {
-        source: '/:path*', // Catch EVERYTHING (/, /login, /dashboard, etc.)
-        destination: '/accountantquestion', // Send it to the landing page
-        permanent: false, // Use 307 (temporary) so browsers don't cache it forever
+        source: '/:path*',
+        destination: '/accountantquestion',
+        permanent: false,
         has: [
           {
             type: 'host',
